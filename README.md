@@ -4,9 +4,11 @@ SwitchBot RGBICWW Floor Lamp を、その日の降水確率に基づいて自動
 
 ## 機能
 
-- つくみ島天気APIから当日の降水確率を取得（T06_12/T12_18/T18_24 の最大値）
-- 降水確率に応じてランプの色または色温度を自動調整
-- Discord に天気通知を送信（オプション）
+- つくみ島天気APIから3日分（当日・翌日・明後日）の天気予報を取得
+- 当日の降水確率（T06_12/T12_18/T18_24 の最大値）に応じてランプの色または色温度を自動調整
+- Discord に3日分の天気予報を通知（オプション）
+  - 天気に応じた絵文字表示
+  - 降水確率に応じた絵文字（☀️⛅🌧️⛈️）
 
 ## インストール
 
@@ -134,12 +136,56 @@ grep CRON /var/log/syslog
 
 ## Discord 通知例
 
-通知には以下が含まれます:
-- 予報タイトルとアイコン
-- 降水確率（最大）と各時間帯の確率
-- 予想気温
-- ランプ設定（RGB または 色温度）
-- 天気の詳細
+3日分の天気予報が通知されます:
+
+```
+┌─────────────────────────────────────────────┐
+│ 🌤️ 3-Day Weather Forecast - 東京都 東京      │
+├─────────────────────────────────────────────┤
+│ 【今日】☀️ 晴れ - 千代田区                   │
+│ ☀️ Precipitation (Max) │ 0%                 │
+│ ☀️ 06-12               │ 0%                 │
+│ ☀️ 12-18               │ 0%                 │
+│ ☀️ 18-24               │ 0%                 │
+│ 🌡️ Temperature          │ 10C / 18C         │
+│ 💡 Lamp Setting         │ RGB(255,127,0)    │
+├─────────────────────────────────────────────┤
+│ 【明日】⛅ くもり - 千代田区                 │
+│ 🌧️ Precipitation (Max) │ 35%                │
+│ ⛅ 06-12               │ 10%                │
+│ ⛅ 12-18               │ 20%                │
+│ 🌧️ 18-24               │ 35%                │
+│ 🌡️ Temperature          │ 12C / 20C         │
+├─────────────────────────────────────────────┤
+│ 【明後日】🌧️ 雨 - 千代田区                  │
+│ ⛈️ Precipitation (Max) │ 75%                │
+│ 🌧️ 06-12               │ 50%                │
+│ 🌧️ 12-18               │ 60%                │
+│ ⛈️ 18-24               │ 75%                │
+│ 🌡️ Temperature          │ 15C / 22C         │
+├─────────────────────────────────────────────┤
+│ Details: 高気圧に覆われて晴れるでしょう      │
+└─────────────────────────────────────────────┘
+```
+
+### 絵文字マッピング
+
+**天気絵文字:**
+| 天気 | 絵文字 |
+|------|--------|
+| 晴れ | ☀️ |
+| くもり | ⛅ |
+| 雨 | 🌧️ |
+| 雪 | ❄️ |
+| 雷 | ⛈️ |
+
+**降水確率絵文字:**
+| 降水確率 | 絵文字 |
+|----------|--------|
+| 0% | ☀️ |
+| 1-30% | ⛅ |
+| 31-60% | 🌧️ |
+| 61-100% | ⛈️ |
 
 ## トラブルシューティング
 
@@ -175,9 +221,11 @@ A Python script that automatically controls a SwitchBot RGBICWW Floor Lamp based
 
 ## Features
 
-- Fetches daily precipitation probability from Tsukumijima Weather API (max of T06_12/T12_18/T18_24)
-- Automatically adjusts lamp color or color temperature based on rain probability
-- Sends weather notifications to Discord (optional)
+- Fetches 3-day weather forecast (today, tomorrow, day after tomorrow) from Tsukumijima Weather API
+- Automatically adjusts lamp color or color temperature based on today's precipitation probability (max of T06_12/T12_18/T18_24)
+- Sends 3-day weather notifications to Discord (optional)
+  - Weather emojis based on forecast
+  - Precipitation emojis (☀️⛅🌧️⛈️) based on probability
 
 ## Installation
 
@@ -305,12 +353,56 @@ grep CRON /var/log/syslog
 
 ## Discord Notification Example
 
-The notification includes:
-- Forecast title and icon
-- Precipitation probability (max) and per-time-slot probabilities
-- Forecast temperature
-- Lamp setting (RGB or Color Temperature)
-- Weather details
+3-day weather forecast notification:
+
+```
+┌─────────────────────────────────────────────┐
+│ 🌤️ 3-Day Weather Forecast - Tokyo           │
+├─────────────────────────────────────────────┤
+│ 【Today】☀️ Sunny - Chiyoda                  │
+│ ☀️ Precipitation (Max) │ 0%                 │
+│ ☀️ 06-12               │ 0%                 │
+│ ☀️ 12-18               │ 0%                 │
+│ ☀️ 18-24               │ 0%                 │
+│ 🌡️ Temperature          │ 10C / 18C         │
+│ 💡 Lamp Setting         │ RGB(255,127,0)    │
+├─────────────────────────────────────────────┤
+│ 【Tomorrow】⛅ Cloudy - Chiyoda              │
+│ 🌧️ Precipitation (Max) │ 35%                │
+│ ⛅ 06-12               │ 10%                │
+│ ⛅ 12-18               │ 20%                │
+│ 🌧️ 18-24               │ 35%                │
+│ 🌡️ Temperature          │ 12C / 20C         │
+├─────────────────────────────────────────────┤
+│ 【Day After】🌧️ Rain - Chiyoda              │
+│ ⛈️ Precipitation (Max) │ 75%                │
+│ 🌧️ 06-12               │ 50%                │
+│ 🌧️ 12-18               │ 60%                │
+│ ⛈️ 18-24               │ 75%                │
+│ 🌡️ Temperature          │ 15C / 22C         │
+├─────────────────────────────────────────────┤
+│ Details: High pressure brings clear skies   │
+└─────────────────────────────────────────────┘
+```
+
+### Emoji Mapping
+
+**Weather Emojis:**
+| Weather | Emoji |
+|---------|-------|
+| Sunny/Clear | ☀️ |
+| Cloudy | ⛅ |
+| Rain | 🌧️ |
+| Snow | ❄️ |
+| Thunder | ⛈️ |
+
+**Precipitation Emojis:**
+| Probability | Emoji |
+|-------------|-------|
+| 0% | ☀️ |
+| 1-30% | ⛅ |
+| 31-60% | 🌧️ |
+| 61-100% | ⛈️ |
 
 ## Troubleshooting
 
