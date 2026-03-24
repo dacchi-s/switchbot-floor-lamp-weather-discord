@@ -206,6 +206,31 @@ def map_rain_to_ct(rain: int) -> int:
 # ------------------------------
 # Discord helpers
 # ------------------------------
+def get_weather_emoji(telop: str) -> str:
+    """天気telopに対応する絵文字を返す"""
+    telop = telop or ""
+    if "雪" in telop:
+        return "❄️"
+    if "雷" in telop:
+        return "⛈️"
+    if "雨" in telop:
+        return "🌧️"
+    if "くもり" in telop or "曇" in telop:
+        return "⛅"
+    if "晴" in telop:
+        return "☀️"
+    return "🌤️"
+
+def get_rain_emoji(percent: int) -> str:
+    """降水確率に対応する絵文字を返す"""
+    if percent == 0:
+        return "☀️"
+    if percent <= 30:
+        return "⛅"
+    if percent <= 60:
+        return "🌧️"
+    return "⛈️"
+
 def rgb_to_decimal(rgb: Tuple[int, int, int]) -> int:
     """Convert RGB tuple to Discord color integer value (decimal)"""
     r, g, b = rgb
@@ -240,78 +265,119 @@ def format_temperature(temp: dict) -> str:
     return "--"
 
 def build_discord_embed(weather_data: dict, lamp_setting: dict) -> dict:
-    """Build Discord Embed object"""
+    """Build Discord Embed object for 3-day weather forecast"""
     if not weather_data:
         return {}
 
-    forecast = weather_data.get("forecasts", [{}])[0]
+    forecasts = weather_data.get("forecasts", [])
+    if not forecasts:
+        return {}
+
     location = weather_data.get("location", {})
-    publishing_office = forecast.get("publishingOffice", "")
-    # Use location.district or location.city as area name
+    publishing_office = forecasts[0].get("publishingOffice", "") if forecasts else ""
     area = location.get("district") or location.get("city", "")
 
     # Title and URL
-    title = f"🌤️ Today's Weather - {location.get('prefecture', '')} {location.get('city', '')}"
-    jma_url = forecast.get("linkUrl", "")
+    title = f"🌤️ 3-Day Weather Forecast - {location.get('prefecture', '')} {location.get('city', '')}"
+    first_forecast = forecasts[0]
+    jma_url = first_forecast.get("linkUrl", "")
     url = jma_url if jma_url else f"https://www.jma.go.jp/bosai/map.html#contents=forecast_map&lat={location.get('lat', '')}&lon={location.get('lon', '')}&zoom=8"
 
     # Color setting (same as lamp color)
     color = rgb_to_decimal(lamp_setting.get("rgb", (255, 127, 0)))
 
-    # Precipitation probability
-    rain = forecast.get("chanceOfRain", {})
-    t00_06 = rain.get("T00_06", "--")
-    t06_12 = rain.get("T06_12", "--")
-    t12_18 = rain.get("T12_18", "--")
-    t18_24 = rain.get("T18_24", "--")
-    max_rain = lamp_setting.get("max_rain", 0)
+    fields = []
 
-    # Get icon URL from weather code
-    telop = forecast.get("telop", "")
-    icon_url = forecast.get("image", {}).get("url", "")
+    for idx, forecast in enumerate(forecasts):
+        date_label = forecast.get("dateLabel", "")
+        telop = forecast.get("telop", "")
+        weather_emoji = get_weather_emoji(telop)
 
-    # Temperature
-    temperature = forecast.get("temperature", {})
-    temp_str = format_temperature(temperature)
+        # Day header
+        header = f"【{date_label}】{weather_emoji} {telop} - {area}" if area else f"【{date_label}】{weather_emoji} {telop}"
+        fields.append({
+            "name": header,
+            "value": "",
+            "inline": False
+        })
 
-    # Detail text
-    detail_text = forecast.get("detail", {})
+        # Precipitation probability
+        rain = forecast.get("chanceOfRain", {})
+        t06_12_pct = _to_int_pct(rain.get("T06_12", "--"))
+        t12_18_pct = _to_int_pct(rain.get("T12_18", "--"))
+        t18_24_pct = _to_int_pct(rain.get("T18_24", "--"))
+        max_rain = max(t06_12_pct, t12_18_pct, t18_24_pct)
 
-    # description: telop only if area is empty
-    desc = f"{telop} - {area}" if area else telop
+        # Max precipitation
+        max_emoji = get_rain_emoji(max_rain)
+        fields.append({
+            "name": f"{max_emoji} Precipitation (Max)",
+            "value": f"{max_rain}%",
+            "inline": True
+        })
+
+        # Time slots with rain emoji
+        fields.append({
+            "name": f"{get_rain_emoji(t06_12_pct)} 06-12",
+            "value": rain.get("T06_12", "--") or "--%",
+            "inline": True
+        })
+        fields.append({
+            "name": f"{get_rain_emoji(t12_18_pct)} 12-18",
+            "value": rain.get("T12_18", "--") or "--%",
+            "inline": True
+        })
+        fields.append({
+            "name": f"{get_rain_emoji(t18_24_pct)} 18-24",
+            "value": rain.get("T18_24", "--") or "--%",
+            "inline": True
+        })
+
+        # Temperature
+        temperature = forecast.get("temperature", {})
+        temp_str = format_temperature(temperature)
+        fields.append({
+            "name": "🌡️ Temperature",
+            "value": temp_str,
+            "inline": True
+        })
+
+        # Lamp Setting (only for today)
+        if idx == 0:
+            if USE_COLOR_TEMPERATURE:
+                ct = lamp_setting.get("ct", 0)
+                fields.append({
+                    "name": "💡 Lamp Setting",
+                    "value": f"Color Temp: {ct}K",
+                    "inline": True
+                })
+            else:
+                r, g, b = lamp_setting.get("rgb", (0, 0, 0))
+                fields.append({
+                    "name": "💡 Lamp Setting",
+                    "value": f"RGB({r},{g},{b})",
+                    "inline": True
+                })
+
+    # Add weatherDetail for today if available
+    detail_text = first_forecast.get("detail", {})
+    if detail_text:
+        weather_detail = detail_text.get("weatherDetail", "")
+        if weather_detail:
+            fields.append({
+                "name": "Details",
+                "value": weather_detail,
+                "inline": False
+            })
+
+    # Thumbnail from today's forecast
+    icon_url = first_forecast.get("image", {}).get("url", "")
 
     embed = {
         "title": title,
         "url": url,
-        "description": desc,
         "color": color,
-        "fields": [
-            {
-                "name": "Precipitation (Max)",
-                "value": f"{max_rain}%",
-                "inline": True
-            },
-            {
-                "name": "06-12",
-                "value": t06_12 if t06_12 else "--%",
-                "inline": True
-            },
-            {
-                "name": "12-18",
-                "value": t12_18 if t12_18 else "--%",
-                "inline": True
-            },
-            {
-                "name": "18-24",
-                "value": t18_24 if t18_24 else "--%",
-                "inline": True
-            },
-            {
-                "name": "Temperature",
-                "value": temp_str,
-                "inline": True
-            },
-        ],
+        "fields": fields,
         "thumbnail": {
             "url": icon_url
         } if icon_url else {},
@@ -319,33 +385,6 @@ def build_discord_embed(weather_data: dict, lamp_setting: dict) -> dict:
             "text": f"{publishing_office} / Tsukumijima Weather API"
         }
     }
-
-    # Add lamp setting to fields
-    if USE_COLOR_TEMPERATURE:
-        ct = lamp_setting.get("ct", 0)
-        embed["fields"].append({
-            "name": "Lamp Setting",
-            "value": f"Color Temp: {ct}K",
-            "inline": True
-        })
-    else:
-        r, g, b = lamp_setting.get("rgb", (0, 0, 0))
-        embed["fields"].append({
-            "name": "Lamp Setting",
-            "value": f"RGB({r},{g},{b})",
-            "inline": True
-        })
-
-    # Add weatherDetail if available
-    if detail_text:
-        weather_detail = detail_text.get("weatherDetail", "")
-        if weather_detail:
-            # Add detail to existing fields
-            embed["fields"].append({
-                "name": "Details",
-                "value": weather_detail,
-                "inline": False
-            })
 
     return embed
 
